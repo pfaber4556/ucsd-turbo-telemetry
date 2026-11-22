@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   LineChart,
   Line,
@@ -29,6 +29,9 @@ export default function App() {
   const [history, setHistory] = useState<Telemetry[]>([]);
   const [recording, setRecording] = useState(false);
   const [connected, setConnected] = useState(false);
+  const recordedData = useRef<Telemetry[]>([]);
+  const recordingActive = useRef(false);
+  const [recordedCount, setRecordedCount] = useState(0);
 
   
   useEffect(() => {
@@ -52,6 +55,12 @@ export default function App() {
             ...prev.slice(-99),
             reading,
           ]);
+
+          if (recordingActive.current) {
+            recordedData.current.push(reading);
+            setRecordedCount(recordedData.current.length);
+          }
+
         } catch (error) {
           console.error("Invalid telemetry:", error);
         }
@@ -72,6 +81,8 @@ export default function App() {
 
     connect();
 
+    
+
     return () => {
       stopped = true;
       clearTimeout(reconnectTimer);
@@ -82,8 +93,14 @@ export default function App() {
 
   const latest = history[history.length - 1];
 
+  
   const downloadCSV = () => {
-    if (!history.length) return;
+    const rows = recordedData.current;
+
+    if (rows.length === 0) {
+      alert("No recorded data available.");
+      return;
+    }
 
     const columns: (keyof Telemetry)[] = [
       "timestamp_ms",
@@ -95,20 +112,40 @@ export default function App() {
 
     const csv = [
       columns.join(","),
-      ...history.map((row) =>
-        columns.map((column) => row[column]).join(",")
+      ...rows.map((row) =>
+        columns.map((key) => row[key]).join(",")
       ),
     ].join("\n");
 
-    const url = URL.createObjectURL(
-      new Blob([csv], { type: "text/csv" })
-    );
+    const blob = new Blob([csv], {
+      type: "text/csv;charset=utf-8;",
+    });
 
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
+
     link.href = url;
-    link.download = "turbine_simulation.csv";
+    link.download = `turbine_recording_${Date.now()}.csv`;
+
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
+
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+
+  const toggleRecording = () => {
+    if (recordingActive.current) {
+      recordingActive.current = false;
+      setRecording(false);
+    } else {
+      recordedData.current = [];
+      setRecordedCount(0);
+
+      recordingActive.current = true;
+      setRecording(true);
+    }
   };
 
   return (
@@ -214,12 +251,11 @@ export default function App() {
         </div>
 
         <div className="buttons">
-          <button
-            onClick={() => setRecording(!recording)}
-            className="record-btn"
-          >
-            {recording ? "Stop Recording" : "Start Recording"}
+          <button onClick={toggleRecording} className="record-btn">
+            {recording ? "⏹ Stop Recording" : "⏺ Start Recording"}
           </button>
+
+          <span>{recordedCount} samples recorded</span>
 
           <button onClick={downloadCSV} className="export-btn">
             Export CSV
