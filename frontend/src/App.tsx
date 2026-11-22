@@ -28,26 +28,57 @@ type Telemetry = {
 export default function App() {
   const [history, setHistory] = useState<Telemetry[]>([]);
   const [recording, setRecording] = useState(false);
+  const [connected, setConnected] = useState(false);
 
+  
   useEffect(() => {
-    const start = Date.now();
+    let socket: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+    let stopped = false;
 
-    const interval = setInterval(() => {
-      const seconds = (Date.now() - start) / 1000;
+    const connect = () => {
+      socket = new WebSocket("ws://localhost:8000/ws/telemetry");
 
-      const reading: Telemetry = {
-        timestamp_ms: Date.now() - start,
-        rpm: Math.round(1200 + 300 * Math.sin(seconds)),
-        temperature_c: 25 + 5 * Math.sin(seconds / 3),
-        pressure_psi: 1.2 + 0.3 * Math.sin(seconds / 2),
-        fault_code: 0,
+      socket.onopen = () => {
+        setConnected(true);
+        console.log("Connected to FastAPI");
       };
 
-      setHistory((prev) => [...prev.slice(-99), reading]);
-    }, 100);
+      socket.onmessage = (event) => {
+        try {
+          const reading: Telemetry = JSON.parse(event.data);
 
-    return () => clearInterval(interval);
+          setHistory((prev) => [
+            ...prev.slice(-99),
+            reading,
+          ]);
+        } catch (error) {
+          console.error("Invalid telemetry:", error);
+        }
+      };
+
+      socket.onerror = () => {
+        console.error("WebSocket error");
+      };
+
+      socket.onclose = () => {
+        setConnected(false);
+
+        if (!stopped) {
+          reconnectTimer = setTimeout(connect, 2000);
+        }
+      };
+    };
+
+    connect();
+
+    return () => {
+      stopped = true;
+      clearTimeout(reconnectTimer);
+      socket?.close();
+    };
   }, []);
+
 
   const latest = history[history.length - 1];
 
@@ -85,12 +116,19 @@ export default function App() {
       <header className="header">
         <div>
           <h1>UCSD Turbine Ground Station</h1>
-          <p>Real-Time Turbomachinery Monitoring</p>
+          <p>
+            <span className="status-dot" />
+            {connected
+              ? "Receiving simulated telemetry from Python"
+              : "Waiting for backend connection"}
+          </p>
         </div>
 
         <div className="connection">
           <Wifi size={18} />
-          <span>SIMULATION ACTIVE</span>
+          <span>
+            {connected ? "BACKEND CONNECTED" : "DISCONNECTED"}
+          </span>
         </div>
       </header>
 
