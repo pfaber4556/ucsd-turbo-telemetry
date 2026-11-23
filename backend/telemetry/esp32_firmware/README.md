@@ -1,6 +1,4 @@
-# UCSD Universal Sensor Telemetry — ESP-IDF C++ v1.4 (hardware-ready)
-
-This is an incremental update of the successfully flashed **v1.3** ESP32 five-channel telemetry application. **It is hardware-ready, not a completed sensor integration.** The code cannot produce real RPM, temperature, or pressure measurements until the team supplies compatible physical sensors and their verified driver implementations.
+# UCSD Universal Sensor Telemetry — ESP-IDF C++
 
 ## What is different from v1.3?
 
