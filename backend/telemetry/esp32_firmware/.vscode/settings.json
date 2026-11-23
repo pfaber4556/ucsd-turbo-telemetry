@@ -20,8 +20,12 @@
     }
   },
   "idf.openOcdConfigs": [
+<<<<<<< HEAD
     "interface/ftdi/esp_ftdi.cfg",
     "target/esp32.cfg"
+=======
+    "board/esp32-wrover-kit-3.3v.cfg"
+>>>>>>> 9287a594362a91a2fb066ba87dd6c824ab5e311f
   ],
   "idf.currentSetup": "C:\\esp\\v6.1.1\\esp-idf",
   "idf.customExtraVars": {
@@ -32,7 +36,11 @@
     "--background-index",
     "--query-driver=**",
     "--compile-commands-dir=c:\\Users\\Jacky\\OneDrive\\Desktop\\ucsd-turbo-telemetry\\backend\\telemetry\\esp32_firmware\\build"
+<<<<<<< HEAD
   ],
   "idf.flashType": "UART",
   "idf.port": "COM3"
+=======
+  ]
+>>>>>>> 9287a594362a91a2fb066ba87dd6c824ab5e311f
 }
