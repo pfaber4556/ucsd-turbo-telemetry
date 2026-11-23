@@ -1,5 +1,5 @@
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   LineChart,
   Line,
@@ -28,79 +28,31 @@ type Telemetry = {
 export default function App() {
   const [history, setHistory] = useState<Telemetry[]>([]);
   const [recording, setRecording] = useState(false);
-  const [connected, setConnected] = useState(false);
-  const recordedData = useRef<Telemetry[]>([]);
-  const recordingActive = useRef(false);
-  const [recordedCount, setRecordedCount] = useState(0);
 
-  
   useEffect(() => {
-    let socket: WebSocket | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
-    let stopped = false;
+    const start = Date.now();
 
-    const connect = () => {
-      socket = new WebSocket("ws://localhost:8000/ws/telemetry");
+    const interval = setInterval(() => {
+      const seconds = (Date.now() - start) / 1000;
 
-      socket.onopen = () => {
-        setConnected(true);
-        console.log("Connected to FastAPI");
+      const reading: Telemetry = {
+        timestamp_ms: Date.now() - start,
+        rpm: Math.round(1200 + 300 * Math.sin(seconds)),
+        temperature_c: 25 + 5 * Math.sin(seconds / 3),
+        pressure_psi: 1.2 + 0.3 * Math.sin(seconds / 2),
+        fault_code: 0,
       };
 
-      socket.onmessage = (event) => {
-        try {
-          const reading: Telemetry = JSON.parse(event.data);
+      setHistory((prev) => [...prev.slice(-99), reading]);
+    }, 100);
 
-          setHistory((prev) => [
-            ...prev.slice(-99),
-            reading,
-          ]);
-
-          if (recordingActive.current) {
-            recordedData.current.push(reading);
-            setRecordedCount(recordedData.current.length);
-          }
-
-        } catch (error) {
-          console.error("Invalid telemetry:", error);
-        }
-      };
-
-      socket.onerror = () => {
-        console.error("WebSocket error");
-      };
-
-      socket.onclose = () => {
-        setConnected(false);
-
-        if (!stopped) {
-          reconnectTimer = setTimeout(connect, 2000);
-        }
-      };
-    };
-
-    connect();
-
-    
-
-    return () => {
-      stopped = true;
-      clearTimeout(reconnectTimer);
-      socket?.close();
-    };
+    return () => clearInterval(interval);
   }, []);
-
 
   const latest = history[history.length - 1];
 
-  
   const downloadCSV = () => {
-    const rows = recordedData.current;
-
-    if (rows.length === 0) {
-      alert("No recorded data available.");
-      return;
-    }
+    if (!history.length) return;
 
     const columns: (keyof Telemetry)[] = [
       "timestamp_ms",
@@ -112,40 +64,20 @@ export default function App() {
 
     const csv = [
       columns.join(","),
-      ...rows.map((row) =>
-        columns.map((key) => row[key]).join(",")
+      ...history.map((row) =>
+        columns.map((column) => row[column]).join(",")
       ),
     ].join("\n");
 
-    const blob = new Blob([csv], {
-      type: "text/csv;charset=utf-8;",
-    });
+    const url = URL.createObjectURL(
+      new Blob([csv], { type: "text/csv" })
+    );
 
-    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-
     link.href = url;
-    link.download = `turbine_recording_${Date.now()}.csv`;
-
-    document.body.appendChild(link);
+    link.download = "turbine_simulation.csv";
     link.click();
-    link.remove();
-
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
-
-
-  const toggleRecording = () => {
-    if (recordingActive.current) {
-      recordingActive.current = false;
-      setRecording(false);
-    } else {
-      recordedData.current = [];
-      setRecordedCount(0);
-
-      recordingActive.current = true;
-      setRecording(true);
-    }
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -153,19 +85,12 @@ export default function App() {
       <header className="header">
         <div>
           <h1>UCSD Turbine Ground Station</h1>
-          <p>
-            <span className="status-dot" />
-            {connected
-              ? "Receiving simulated telemetry from Python"
-              : "Waiting for backend connection"}
-          </p>
+          <p>Real-Time Turbomachinery Monitoring</p>
         </div>
 
         <div className="connection">
           <Wifi size={18} />
-          <span>
-            {connected ? "BACKEND CONNECTED" : "DISCONNECTED"}
-          </span>
+          <span>SIMULATION ACTIVE</span>
         </div>
       </header>
 
@@ -251,11 +176,12 @@ export default function App() {
         </div>
 
         <div className="buttons">
-          <button onClick={toggleRecording} className="record-btn">
-            {recording ? "⏹ Stop Recording" : "⏺ Start Recording"}
+          <button
+            onClick={() => setRecording(!recording)}
+            className="record-btn"
+          >
+            {recording ? "Stop Recording" : "Start Recording"}
           </button>
-
-          <span>{recordedCount} samples recorded</span>
 
           <button onClick={downloadCSV} className="export-btn">
             Export CSV
